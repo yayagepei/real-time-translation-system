@@ -1,0 +1,33 @@
+# 设置所有文本文件默认使用UTF-8编码
+* text=auto eol=lf encoding=utf-8
+
+# 源代码文件
+*.java text diff=java
+*.html text diff=html
+*.css text
+*.js text
+*.ts text
+*.xml text
+*.yml text
+*.yaml text
+*.json text
+*.properties text
+*.md text
+*.sql text
+
+# 二进制文件
+*.jar binary
+*.war binary
+*.zip binary
+*.tar binary
+*.tar.gz binary
+*.gz binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mp3 binary
+*.wav binary
+*.mp4 binary
+*.pdf binary 
