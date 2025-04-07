@@ -3,407 +3,545 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>实时语音转译系统</title>
+    <title>实时翻译系统测试页面</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
+        body { 
+            font-family: 'Microsoft YaHei', Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
             padding: 20px;
-            color: #333;
+            line-height: 1.6;
         }
-        h1 {
-            color: #0066cc;
-            text-align: center;
+        .container { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 20px; 
         }
-        .container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        .config-panel, .operation-panel, .result-panel {
+        .card {
             border: 1px solid #ddd;
             border-radius: 8px;
-            padding: 15px;
+            padding: 20px;
             background-color: #f9f9f9;
         }
-        .form-group {
-            margin-bottom: 15px;
+        h1, h2 { color: #333; }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
         }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
         select, input {
-            width: 100%;
             padding: 8px;
+            margin: 5px 0;
             border: 1px solid #ddd;
             border-radius: 4px;
+            width: 100%;
         }
-        button {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
-        }
-        .primary-btn {
-            background-color: #0066cc;
-            color: white;
-        }
-        .secondary-btn {
-            background-color: #f0f0f0;
-            color: #333;
-        }
-        .primary-btn:hover {
-            background-color: #0055aa;
-        }
-        .secondary-btn:hover {
-            background-color: #e0e0e0;
-        }
-        .button-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .status {
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 10px;
-        }
-        .connected {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        .disconnected {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        .log-panel {
+        .logs {
             height: 200px;
             overflow-y: auto;
             border: 1px solid #ddd;
-            border-radius: 4px;
             padding: 10px;
             background-color: #f5f5f5;
             font-family: monospace;
+            white-space: pre-wrap;
         }
-        .log-entry {
-            margin-bottom: 5px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
+        .status {
+            font-weight: bold;
         }
-        .audio-panel {
+        .connected { color: green; }
+        .disconnected { color: red; }
+        .connecting { color: orange; }
+        .mic-active { background-color: red; }
+        
+        .config-row {
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            flex-wrap: wrap;
             gap: 10px;
+            margin-bottom: 10px;
         }
-        audio {
-            width: 100%;
+        
+        .config-item {
+            flex: 1;
+            min-width: 200px;
         }
-        .recording {
-            animation: pulse 1.5s infinite;
+        
+        .result-area {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            min-height: 100px;
+            background-color: white;
         }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
-    <h1>实时语音转译系统</h1>
-    
     <div class="container">
-        <div class="config-panel">
-            <h2>配置</h2>
-            <div class="form-group">
-                <label for="provider">服务提供商</label>
-                <select id="provider">
-                    <option value="microsoft">Microsoft</option>
-                    <option value="openai">OpenAI</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="sourceLanguage">源语言</label>
-                <select id="sourceLanguage">
-                    <option value="zh-CN">中文 (zh-CN)</option>
-                    <option value="en-US">英语 (en-US)</option>
-                    <option value="ja-JP">日语 (ja-JP)</option>
-                    <option value="ko-KR">韩语 (ko-KR)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="targetLanguage">目标语言</label>
-                <select id="targetLanguage">
-                    <option value="en-US">英语 (en-US)</option>
-                    <option value="zh-CN">中文 (zh-CN)</option>
-                    <option value="ja-JP">日语 (ja-JP)</option>
-                    <option value="ko-KR">韩语 (ko-KR)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="audioFormat">音频格式</label>
-                <select id="audioFormat">
-                    <option value="WAV">WAV</option>
-                    <option value="MP3">MP3</option>
-                    <option value="OGG">OGG</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="voice">声音</label>
-                <select id="voice">
-                    <option value="zh-CN-XiaoxiaoNeural">小晓 (女声, 中文)</option>
-                    <option value="zh-CN-YunxiNeural">云希 (男声, 中文)</option>
-                    <option value="en-US-AriaNeural">Aria (女声, 英语)</option>
-                    <option value="en-US-GuyNeural">Guy (男声, 英语)</option>
-                    <option value="alloy">Alloy (OpenAI)</option>
-                    <option value="echo">Echo (OpenAI)</option>
-                    <option value="fable">Fable (OpenAI)</option>
-                    <option value="onyx">Onyx (OpenAI)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="speed">语速 (0.5-2.0)</label>
-                <input type="number" id="speed" min="0.5" max="2.0" step="0.1" value="1.0">
-            </div>
+        <h1>实时翻译系统测试页面</h1>
+        
+        <div class="card">
+            <h2>连接状态</h2>
+            <p>WebSocket状态: <span id="ws-status" class="status disconnected">未连接</span></p>
+            <button id="connect-btn">连接服务器</button>
+            <button id="disconnect-btn" disabled>断开连接</button>
         </div>
         
-        <div class="operation-panel">
-            <h2>操作</h2>
-            <div id="connectionStatus" class="status disconnected">未连接</div>
-            
-            <div class="button-row">
-                <button id="connectBtn" class="primary-btn">连接服务器</button>
-                <button id="disconnectBtn" class="secondary-btn" disabled>断开连接</button>
-            </div>
-            
-            <div class="audio-panel">
-                <h3>音频输入/输出</h3>
-                <div class="button-row">
-                    <button id="startRecordingBtn" class="primary-btn" disabled>开始录音</button>
-                    <button id="stopRecordingBtn" class="secondary-btn" disabled>停止录音</button>
+        <div class="card">
+            <h2>翻译配置</h2>
+            <div class="config-row">
+                <div class="config-item">
+                    <label for="source-language">源语言:</label>
+                    <select id="source-language">
+                        <option value="zh-CN">中文（普通话，简体）</option>
+                        <option value="en-US">英语（美国）</option>
+                        <option value="ja-JP">日语</option>
+                        <option value="ko-KR">韩语</option>
+                        <option value="fr-FR">法语</option>
+                        <option value="de-DE">德语</option>
+                        <option value="es-ES">西班牙语</option>
+                        <option value="ru-RU">俄语</option>
+                    </select>
                 </div>
-                <audio id="audioOutput" controls></audio>
+                
+                <div class="config-item">
+                    <label for="target-language">目标语言:</label>
+                    <select id="target-language">
+                        <option value="en-US">英语（美国）</option>
+                        <option value="zh-CN">中文（普通话，简体）</option>
+                        <option value="ja-JP">日语</option>
+                        <option value="ko-KR">韩语</option>
+                        <option value="fr-FR">法语</option>
+                        <option value="de-DE">德语</option>
+                        <option value="es-ES">西班牙语</option>
+                        <option value="ru-RU">俄语</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="config-row">
+                <div class="config-item">
+                    <label for="provider">服务提供者:</label>
+                    <select id="provider">
+                        <option value="microsoft">Microsoft Azure</option>
+                        <option value="openai">OpenAI</option>
+                    </select>
+                </div>
+                
+                <div class="config-item">
+                    <label for="voice">语音:</label>
+                    <select id="voice">
+                        <option value="">默认声音</option>
+                        <option value="zh-CN-XiaoxiaoNeural">小筱（女声，中文）</option>
+                        <option value="zh-CN-YunxiNeural">云希（男声，中文）</option>
+                        <option value="en-US-AriaNeural">Aria（女声，英语）</option>
+                        <option value="en-US-GuyNeural">Guy（男声，英语）</option>
+                        <option value="ja-JP-NanamiNeural">Nanami（女声，日语）</option>
+                    </select>
+                </div>
             </div>
         </div>
         
-        <div class="result-panel">
-            <h2>结果日志</h2>
-            <div id="logPanel" class="log-panel"></div>
+        <div class="card">
+            <h2>语音识别</h2>
+            <p>点击麦克风按钮开始录音：</p>
+            <button id="mic-btn">🎤 开始录音</button>
+            <div id="recording-status"></div>
+            
+            <h3>识别结果:</h3>
+            <div id="recognition-result" class="result-area"></div>
+        </div>
+        
+        <div class="card">
+            <h2>翻译结果</h2>
+            <div id="translation-result" class="result-area"></div>
+            <div class="controls">
+                <button id="play-btn" disabled>🔊 播放</button>
+                <button id="copy-btn">📋 复制</button>
+                <button id="clear-btn">🗑️ 清除</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>文件上传翻译</h2>
+            <input type="file" id="audio-file" accept="audio/*">
+            <button id="upload-btn">上传并翻译</button>
+            <div id="upload-result" class="result-area"></div>
+        </div>
+        
+        <div class="card">
+            <h2>系统日志</h2>
+            <div id="logs" class="logs"></div>
+            <button id="clear-logs-btn">清除日志</button>
         </div>
     </div>
-    
+
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script>
-        // DOM 元素
-        const connectBtn = document.getElementById('connectBtn');
-        const disconnectBtn = document.getElementById('disconnectBtn');
-        const startRecordingBtn = document.getElementById('startRecordingBtn');
-        const stopRecordingBtn = document.getElementById('stopRecordingBtn');
-        const connectionStatus = document.getElementById('connectionStatus');
-        const logPanel = document.getElementById('logPanel');
-        const audioOutput = document.getElementById('audioOutput');
+        // DOM元素
+        const wsStatus = document.getElementById('ws-status');
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const micBtn = document.getElementById('mic-btn');
+        const playBtn = document.getElementById('play-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const uploadBtn = document.getElementById('upload-btn');
+        const clearLogsBtn = document.getElementById('clear-logs-btn');
+        const recordingStatus = document.getElementById('recording-status');
+        const recognitionResult = document.getElementById('recognition-result');
+        const translationResult = document.getElementById('translation-result');
+        const uploadResult = document.getElementById('upload-result');
+        const logs = document.getElementById('logs');
         
-        // WebSocket 连接
-        let websocket = null;
-        // 音频上下文
-        let audioContext = null;
-        // 媒体流
-        let mediaStream = null;
-        // 媒体记录器
+        // 配置选择器
+        const sourceLanguage = document.getElementById('source-language');
+        const targetLanguage = document.getElementById('target-language');
+        const provider = document.getElementById('provider');
+        const voice = document.getElementById('voice');
+        const audioFile = document.getElementById('audio-file');
+        
+        // 全局变量
+        let socket = null;
         let mediaRecorder = null;
-        // 音频块
         let audioChunks = [];
+        let isRecording = false;
+        let audioContext = null;
+        let audioElement = null;
         
         // 添加日志
         function addLog(message) {
-            const logEntry = document.createElement('div');
-            logEntry.className = 'log-entry';
-            logEntry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
-            logPanel.appendChild(logEntry);
-            logPanel.scrollTop = logPanel.scrollHeight;
+            const now = new Date();
+            const timestamp = now.toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
         }
         
-        // 连接到服务器
-        connectBtn.addEventListener('click', () => {
-            const provider = document.getElementById('provider').value;
-            const sourceLanguage = document.getElementById('sourceLanguage').value;
-            const targetLanguage = document.getElementById('targetLanguage').value;
-            const audioFormat = document.getElementById('audioFormat').value;
-            const voice = document.getElementById('voice').value;
-            const speed = parseFloat(document.getElementById('speed').value);
-            
-            // 创建WebSocket连接
-            websocket = new WebSocket(`ws://${window.location.host}/translate`);
-            
-            websocket.onopen = () => {
-                // 发送初始化消息
-                const initMessage = {
-                    type: "INIT",
-                    request: {
-                        provider,
-                        sourceLanguage,
-                        targetLanguage,
-                        audioFormat,
-                        voice,
-                        speed
+        // 连接WebSocket
+        function connectWebSocket() {
+            try {
+                const wsUrl = `/sockjs/speech`;
+                
+                socket = new SockJS(wsUrl);
+                wsStatus.className = 'status connecting';
+                wsStatus.textContent = '正在连接...';
+                addLog(`正在连接到 ${wsUrl}`);
+                
+                socket.onopen = function() {
+                    wsStatus.className = 'status connected';
+                    wsStatus.textContent = '已连接';
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    addLog('WebSocket连接已建立');
+                };
+                
+                socket.onmessage = function(event) {
+                    const message = JSON.parse(event.data);
+                    addLog(`收到消息: ${message.type}`);
+                    
+                    switch(message.type) {
+                        case 'TEXT_RESULT':
+                            // 显示识别结果
+                            if (message.text) {
+                                recognitionResult.textContent = message.text;
+                            }
+                            break;
+                            
+                        case 'TRANSLATION':
+                            // 显示翻译结果
+                            if (message.text) {
+                                translationResult.textContent = message.text;
+                            }
+                            break;
+                            
+                        case 'AUDIO_RESULT':
+                            // 接收音频数据并准备播放
+                            if (message.audio) {
+                                const base64Audio = message.audio;
+                                const audioData = base64ToArrayBuffer(base64Audio);
+                                
+                                // 创建音频对象
+                                if (audioElement) {
+                                    URL.revokeObjectURL(audioElement.src);
+                                }
+                                
+                                const audioBlob = new Blob([audioData], { type: 'audio/wav' });
+                                audioElement = new Audio(URL.createObjectURL(audioBlob));
+                                playBtn.disabled = false;
+                            }
+                            break;
+                            
+                        case 'ERROR':
+                            // 显示错误信息
+                            addLog(`错误: ${message.text}`);
+                            alert(`发生错误: ${message.text}`);
+                            break;
+                            
+                        default:
+                            addLog(`未知消息类型: ${message.type}`);
                     }
                 };
                 
-                websocket.send(JSON.stringify(initMessage));
-                
-                connectionStatus.textContent = '已连接';
-                connectionStatus.className = 'status connected';
-                
-                connectBtn.disabled = true;
-                disconnectBtn.disabled = false;
-                startRecordingBtn.disabled = false;
-                
-                addLog('已连接到服务器');
-            };
-            
-            websocket.onmessage = (event) => {
-                // 处理接收到的消息
-                if (event.data instanceof Blob) {
-                    // 音频数据
-                    handleAudioData(event.data);
-                } else {
-                    // 文本消息
-                    const message = JSON.parse(event.data);
-                    handleTextMessage(message);
-                }
-            };
-            
-            websocket.onclose = () => {
-                connectionStatus.textContent = '连接已关闭';
-                connectionStatus.className = 'status disconnected';
-                
-                connectBtn.disabled = false;
-                disconnectBtn.disabled = true;
-                startRecordingBtn.disabled = true;
-                stopRecordingBtn.disabled = true;
-                
-                addLog('连接已关闭');
-                
-                // 停止录音
-                stopRecording();
-            };
-            
-            websocket.onerror = (error) => {
-                addLog(`WebSocket错误: ${error}`);
-                connectionStatus.textContent = '连接错误';
-                connectionStatus.className = 'status disconnected';
-            };
-        });
-        
-        // 断开连接
-        disconnectBtn.addEventListener('click', () => {
-            if (websocket) {
-                // 发送关闭消息
-                const closeMessage = {
-                    type: "CLOSE"
+                socket.onclose = function() {
+                    wsStatus.className = 'status disconnected';
+                    wsStatus.textContent = '已断开连接';
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    stopRecording();
+                    addLog('WebSocket连接已关闭');
                 };
                 
-                websocket.send(JSON.stringify(closeMessage));
-                websocket.close();
-                
-                // 停止录音
-                stopRecording();
+                socket.onerror = function(error) {
+                    wsStatus.className = 'status disconnected';
+                    wsStatus.textContent = '连接错误';
+                    addLog(`WebSocket错误: ${error}`);
+                };
+            } catch (error) {
+                addLog(`创建WebSocket时出错: ${error.message}`);
+                alert(`无法连接到服务器: ${error.message}`);
             }
-        });
+        }
+        
+        // 断开WebSocket连接
+        function disconnectWebSocket() {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+        }
         
         // 开始录音
-        startRecordingBtn.addEventListener('click', async () => {
+        async function startRecording() {
             try {
-                // 获取媒体流
-                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                // 创建音频上下文
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
                 
-                // 创建媒体记录器
-                mediaRecorder = new MediaRecorder(mediaStream);
-                
-                mediaRecorder.ondataavailable = (event) => {
+                mediaRecorder.ondataavailable = event => {
                     if (event.data.size > 0) {
                         audioChunks.push(event.data);
-                        
-                        // 发送音频数据
-                        if (websocket && websocket.readyState === WebSocket.OPEN) {
-                            websocket.send(event.data);
-                        }
                     }
                 };
                 
                 mediaRecorder.onstop = () => {
-                    mediaStream.getTracks().forEach(track => track.stop());
-                    audioChunks = [];
+                    if (!isRecording) return;
+                    
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    sendAudioData(audioBlob);
+                    
+                    // 继续录音（分段发送）
+                    if (isRecording) {
+                        mediaRecorder.start(5000); // 每5秒发送一次
+                    }
                 };
                 
-                // 每500毫秒发送一次数据
-                mediaRecorder.start(500);
-                
-                startRecordingBtn.disabled = true;
-                stopRecordingBtn.disabled = false;
-                startRecordingBtn.classList.add('recording');
-                
+                // 开始录音
+                mediaRecorder.start(5000); // 每5秒发送一次
+                isRecording = true;
+                micBtn.classList.add('mic-active');
+                micBtn.textContent = '🎤 停止录音';
+                recordingStatus.textContent = '正在录音...';
                 addLog('开始录音');
+                
             } catch (error) {
                 addLog(`录音错误: ${error.message}`);
+                alert(`无法访问麦克风: ${error.message}`);
             }
-        });
+        }
         
         // 停止录音
-        stopRecordingBtn.addEventListener('click', () => {
-            stopRecording();
-        });
-        
-        // 停止录音函数
         function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            if (mediaRecorder && isRecording) {
+                isRecording = false;
                 mediaRecorder.stop();
                 
-                startRecordingBtn.disabled = false;
-                stopRecordingBtn.disabled = true;
-                startRecordingBtn.classList.remove('recording');
+                // 停止所有轨道
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
                 
+                micBtn.classList.remove('mic-active');
+                micBtn.textContent = '🎤 开始录音';
+                recordingStatus.textContent = '';
                 addLog('停止录音');
             }
         }
         
-        // 处理接收到的音频数据
-        function handleAudioData(blob) {
-            const url = URL.createObjectURL(blob);
-            audioOutput.src = url;
-            audioOutput.play().catch(error => {
-                addLog(`播放错误: ${error.message}`);
-            });
+        // 发送音频数据
+        function sendAudioData(audioBlob) {
+            if (!socket || socket.readyState !== SockJS.OPEN) {
+                addLog('无法发送音频：WebSocket未连接');
+                return;
+            }
             
-            addLog(`接收到音频数据: ${Math.round(blob.size / 1024)} KB`);
+            const reader = new FileReader();
+            reader.onload = function() {
+                const arrayBuffer = reader.result;
+                const base64Audio = arrayBufferToBase64(arrayBuffer);
+                
+                // 创建请求对象
+                const translationRequest = {
+                    sourceLanguage: sourceLanguage.value,
+                    targetLanguage: targetLanguage.value,
+                    provider: provider.value,
+                    mode: 'speech-to-speech'
+                };
+                
+                if (voice.value) {
+                    translationRequest.voice = voice.value;
+                }
+                
+                // 创建消息对象
+                const message = {
+                    type: 'AUDIO_DATA',
+                    audio: base64Audio,
+                    request: translationRequest
+                };
+                
+                // 发送消息
+                socket.send(JSON.stringify(message));
+                addLog(`已发送 ${Math.round(arrayBuffer.byteLength / 1024)} KB 音频数据`);
+            };
+            
+            reader.readAsArrayBuffer(audioBlob);
         }
         
-        // 处理接收到的文本消息
-        function handleTextMessage(message) {
-            switch (message.type) {
-                case 'INIT':
-                    addLog(`初始化成功: ${message.message}`);
-                    break;
-                    
-                case 'TEXT_RESULT':
-                    addLog(`识别文本: ${message.message}`);
-                    break;
-                    
-                case 'ERROR':
-                    addLog(`错误: ${message.message}`);
-                    break;
-                    
-                default:
-                    addLog(`收到消息: ${JSON.stringify(message)}`);
+        // ArrayBuffer转Base64
+        function arrayBufferToBase64(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return window.btoa(binary);
+        }
+        
+        // Base64转ArrayBuffer
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+        
+        // 上传并翻译音频文件
+        function uploadAndTranslate() {
+            const file = audioFile.files[0];
+            if (!file) {
+                alert('请选择音频文件');
+                return;
+            }
+            
+            // 创建FormData对象
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('sourceLanguage', sourceLanguage.value);
+            formData.append('targetLanguage', targetLanguage.value);
+            formData.append('provider', provider.value);
+            
+            if (voice.value) {
+                formData.append('voice', voice.value);
+            }
+            
+            addLog(`正在上传文件: ${file.name} (${Math.round(file.size / 1024)} KB)`);
+            
+            // 发送请求
+            fetch('/api/translation/file', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP错误 ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                addLog('文件翻译完成');
+                uploadResult.textContent = data.text || '无翻译结果';
+            })
+            .catch(error => {
+                addLog(`文件翻译错误: ${error.message}`);
+                alert(`上传失败: ${error.message}`);
+            });
+        }
+        
+        // 复制文本
+        function copyText() {
+            const text = translationResult.textContent;
+            if (text) {
+                navigator.clipboard.writeText(text)
+                    .then(() => {
+                        addLog('文本已复制到剪贴板');
+                    })
+                    .catch(err => {
+                        addLog(`复制失败: ${err}`);
+                    });
             }
         }
+        
+        // 事件监听器
+        connectBtn.addEventListener('click', connectWebSocket);
+        disconnectBtn.addEventListener('click', disconnectWebSocket);
+        
+        micBtn.addEventListener('click', function() {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                if (!socket || socket.readyState !== SockJS.OPEN) {
+                    alert('请先连接到服务器');
+                    return;
+                }
+                startRecording();
+            }
+        });
+        
+        playBtn.addEventListener('click', function() {
+            if (audioElement) {
+                audioElement.play();
+                addLog('正在播放合成的语音');
+            }
+        });
+        
+        copyBtn.addEventListener('click', copyText);
+        
+        clearBtn.addEventListener('click', function() {
+            recognitionResult.textContent = '';
+            translationResult.textContent = '';
+            if (audioElement) {
+                URL.revokeObjectURL(audioElement.src);
+                audioElement = null;
+            }
+            playBtn.disabled = true;
+            addLog('已清除结果');
+        });
+        
+        uploadBtn.addEventListener('click', uploadAndTranslate);
+        
+        clearLogsBtn.addEventListener('click', function() {
+            logs.innerHTML = '';
+        });
+        
+        // 初始化
+        addLog('页面已加载，准备就绪');
     </script>
 </body>
 </html> 

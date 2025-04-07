@@ -17,7 +17,6 @@
     <properties>
         <java.version>17</java.version>
         <azure.speech.version>1.43.0</azure.speech.version>
-        <openai.version>3.6.1</openai.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
@@ -45,18 +44,19 @@
             <version>${azure.speech.version}</version>
         </dependency>
         
-        <!-- OpenAI API -->
+        <!-- OpenAI API - 使用通用HTTP客户端和JSON处理 -->
         <dependency>
-            <groupId>com.theokanning.openai-gpt3-java</groupId>
-            <artifactId>service</artifactId>
-            <version>${openai.version}</version>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
         </dependency>
         
         <!-- Project Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <optional>true</optional>
+            <version>1.18.38</version>
+            <scope>provided</scope>
         </dependency>
         
         <!-- Apache Commons Pool for object pooling -->
@@ -84,31 +84,22 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <excludes>
-                        <exclude>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                        </exclude>
-                    </excludes>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.38</version>
+                        </path>
+                    </annotationProcessorPaths>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
         </plugins>
     </build>
     
-    <repositories>
-        <!-- 添加微软认知服务的Maven存储库 -->
-        <repository>
-            <id>maven-cognitiveservices-speech</id>
-            <name>Microsoft Cognitive Services Speech Maven Repository</name>
-            <url>https://csspeechstorage.blob.core.windows.net/maven/</url>
-        </repository>
-    </repositories>
 </project> 

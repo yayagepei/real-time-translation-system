@@ -62,7 +62,7 @@ public class TranslationServiceTest {
                 .thenReturn(Flux.just(recognizedText));
         
         // 配置文本合成返回模拟音频
-        when(speechService.textToSpeech(any(), any(), any()))
+        when(speechService.textToSpeech(any(String.class), any(TranslationRequest.class), any(WebSocketSession.class)))
                 .thenReturn(Flux.just(synthesizedAudio));
         
         // 执行测试

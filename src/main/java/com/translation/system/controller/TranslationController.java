@@ -62,9 +62,9 @@ public class TranslationController {
             
             String text;
             if ("openai".equalsIgnoreCase(provider)) {
-                text = openAISpeechService.speechToText(audioData, sourceLanguage);
+                text = openAISpeechService.speechToText(audioData, sourceLanguage).blockFirst();
             } else {
-                text = microsoftSpeechService.speechToText(audioData, sourceLanguage);
+                text = microsoftSpeechService.speechToText(audioData, sourceLanguage).blockFirst();
             }
             
             response.put("success", true);

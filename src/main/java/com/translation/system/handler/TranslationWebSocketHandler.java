@@ -110,23 +110,30 @@ public class TranslationWebSocketHandler extends AbstractWebSocketHandler {
         try {
             // 获取音频数据
             byte[] audioData = message.getPayload().array();
-            log.debug("Received audio data from session {}: {} bytes", sessionId, audioData.length);
+            log.info("收到语音数据: 会话ID={}, 数据大小={}字节, 远程地址={}", 
+                    sessionId, audioData.length, session.getRemoteAddress());
             
             // 获取会话配置
             TranslationRequest request = sessionConfigs.get(sessionId);
             if (request == null) {
+                log.warn("会话未初始化: 会话ID={}", sessionId);
                 sendErrorMessage(session, "会话未初始化，请先发送初始化配置");
                 return;
             }
             
             // 音频数据大小检查
             if (audioData.length == 0) {
+                log.warn("收到空的音频数据: 会话ID={}", sessionId);
                 sendErrorMessage(session, "收到空的音频数据");
                 return;
             }
             
+            log.info("开始处理语音转译: 会话ID={}, 源语言={}, 目标语言={}, 服务提供商={}", 
+                    sessionId, request.getSourceLanguage(), request.getTargetLanguage(), request.getProvider());
+            
             // 处理音频转译
             Flux<byte[]> resultFlux = translationService.translateSpeech(audioData, request, session);
+            log.info("转译服务返回Flux: 会话ID={}", sessionId);
             
             // 设置最大处理时间，防止处理时间过长
             final long maxProcessingTime = 60000; // 最长等待60秒
@@ -138,43 +145,50 @@ public class TranslationWebSocketHandler extends AbstractWebSocketHandler {
                     try {
                         // 检查处理是否超时
                         if (System.currentTimeMillis() - startTime > maxProcessingTime) {
-                            log.warn("Processing audio from session {} took too long, stopping", sessionId);
+                            log.warn("处理时间过长: 会话ID={}, 已用时间={}毫秒", 
+                                    sessionId, (System.currentTimeMillis() - startTime));
                             return;
                         }
                         
                         // 检查会话是否仍然打开
                         if (!session.isOpen()) {
-                            log.warn("Session {} closed during processing, stopping", sessionId);
+                            log.warn("会话已关闭，停止处理: 会话ID={}", sessionId);
                             return;
                         }
                         
                         // 检查数据有效性
                         if (data != null && data.length > 0) {
+                            log.info("发送合成的语音数据: 会话ID={}, 数据大小={}字节", 
+                                    sessionId, data.length);
                             session.sendMessage(new BinaryMessage(data));
+                        } else {
+                            log.warn("合成的语音数据为空: 会话ID={}", sessionId);
                         }
                     } catch (IOException e) {
-                        log.error("Error sending audio result to session {}: {}", sessionId, e.getMessage());
+                        log.error("发送语音数据失败: 会话ID={}, 错误={}", sessionId, e.getMessage(), e);
                     }
                 },
                 error -> {
-                    log.error("Error in translation for session {}: {}", sessionId, error.getMessage());
+                    log.error("转译处理错误: 会话ID={}, 错误={}", sessionId, error.getMessage(), error);
                     sendErrorMessage(session, "转译处理发生错误: " + error.getMessage());
                 },
                 () -> {
-                    log.debug("Translation completed for session: {}", sessionId);
+                    log.info("转译处理完成: 会话ID={}, 总耗时={}毫秒", 
+                            sessionId, (System.currentTimeMillis() - startTime));
                     try {
                         sendTextMessage(session, WebSocketMessage.builder()
                                 .type(MessageType.TEXT_RESULT)
                                 .message("处理完成")
                                 .build());
                     } catch (Exception e) {
-                        log.error("Error sending completion message to session {}: {}", sessionId, e.getMessage());
+                        log.error("发送完成消息失败: 会话ID={}, 错误={}", sessionId, e.getMessage(), e);
                     }
                 }
             );
             
         } catch (Exception e) {
-            log.error("Error handling binary message from session {}: {}", sessionId, e.getMessage());
+            log.error("处理二进制消息异常: 会话ID={}, 错误类型={}, 错误信息={}", 
+                    sessionId, e.getClass().getSimpleName(), e.getMessage(), e);
             sendErrorMessage(session, "处理音频数据时发生错误: " + e.getMessage());
         }
     }

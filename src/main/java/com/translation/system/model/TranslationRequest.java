@@ -55,9 +55,20 @@ public class TranslationRequest {
     private String mode = "speech-to-speech";
     
     /**
+     * 音频格式，默认为WAV
+     */
+    @Builder.Default
+    private AudioFormat audioFormat = AudioFormat.WAV;
+    
+    /**
      * 声音ID，用于文本到语音转换
      */
     private String voiceId;
+    
+    /**
+     * 声音名称，用于文本到语音转换（与voiceId二选一使用）
+     */
+    private String voice;
     
     /**
      * 自定义配置选项
@@ -68,6 +79,16 @@ public class TranslationRequest {
      * 会话ID，用于标识会话
      */
     private String sessionId;
+    
+    /**
+     * 语速
+     */
+    private Double speed;
+    
+    /**
+     * 采样率（Hz）
+     */
+    private Integer sampleRate;
     
     /**
      * 自定义配置选项
