@@ -91,6 +91,13 @@ public class TranslationRequest {
     private Integer sampleRate;
     
     /**
+     * 是否返回音频数据
+     * 当值为true时，服务会返回转换后的音频数据
+     */
+    @Builder.Default
+    private Boolean returnAudio = false;
+    
+    /**
      * 自定义配置选项
      */
     @Data

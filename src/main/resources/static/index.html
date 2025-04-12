@@ -182,6 +182,9 @@
             <h2>文件上传翻译</h2>
             <input type="file" id="audio-file" accept="audio/*">
             <button id="upload-btn">上传并翻译</button>
+            <div class="controls">
+                <button id="upload-play-btn" disabled>🔊 播放翻译语音</button>
+            </div>
             <div id="upload-result" class="result-area"></div>
         </div>
         
@@ -203,6 +206,7 @@
         const copyBtn = document.getElementById('copy-btn');
         const clearBtn = document.getElementById('clear-btn');
         const uploadBtn = document.getElementById('upload-btn');
+        const uploadPlayBtn = document.getElementById('upload-play-btn');
         const clearLogsBtn = document.getElementById('clear-logs-btn');
         const recordingStatus = document.getElementById('recording-status');
         const recognitionResult = document.getElementById('recognition-result');
@@ -224,13 +228,56 @@
         let isRecording = false;
         let audioContext = null;
         let audioElement = null;
+        let uploadAudioElement = null; // 用于文件上传后的音频播放
+        
+        // 心跳检测相关变量
+        let heartbeatInterval = null;
+        let lastHeartbeatTime = null;
+        const HEARTBEAT_INTERVAL = 30000; // 每30秒发送一次心跳
+        const HEARTBEAT_TIMEOUT = 10000;  // 10秒内没收到响应则认为连接断开
         
         // 添加日志
         function addLog(message) {
             const now = new Date();
-            const timestamp = now.toLocaleTimeString();
+            const timestamp = now.toLocaleTimeString() + '.' + String(now.getMilliseconds()).padStart(3, '0');
             logs.innerHTML += `[${timestamp}] ${message}\n`;
             logs.scrollTop = logs.scrollHeight;
+            
+            // 添加到控制台，方便调试
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        // 添加详细日志（可选择日志级别）
+        function addDetailedLog(level, component, message, data = null) {
+            const now = new Date();
+            const timestamp = now.toLocaleTimeString() + '.' + String(now.getMilliseconds()).padStart(3, '0');
+            const levelText = level.toUpperCase().padEnd(5);
+            
+            let logMessage = `[${timestamp}] ${levelText} [${component}] ${message}`;
+            logs.innerHTML += logMessage + '\n';
+            logs.scrollTop = logs.scrollHeight;
+            
+            // 添加到控制台
+            if (data) {
+                console.log(logMessage, data);
+                
+                // 在特定情况下显示更详细的信息
+                if (level === 'error' || level === 'warn') {
+                    try {
+                        const dataStr = JSON.stringify(data);
+                        if (dataStr.length < 100) {
+                            logs.innerHTML += `  └─ 数据: ${dataStr}\n`;
+                        } else {
+                            logs.innerHTML += `  └─ 数据: (数据过长，请查看控制台)\n`;
+                        }
+                        logs.scrollTop = logs.scrollHeight;
+                    } catch (e) {
+                        // 忽略序列化错误
+                    }
+                }
+            } else {
+                console.log(logMessage);
+            }
         }
         
         // 连接WebSocket
@@ -238,35 +285,77 @@
             try {
                 const wsUrl = `/sockjs/speech`;
                 
+                addDetailedLog('info', 'WebSocket', `正在连接到 ${wsUrl}`);
                 socket = new SockJS(wsUrl);
                 wsStatus.className = 'status connecting';
                 wsStatus.textContent = '正在连接...';
-                addLog(`正在连接到 ${wsUrl}`);
                 
                 socket.onopen = function() {
                     wsStatus.className = 'status connected';
                     wsStatus.textContent = '已连接';
                     connectBtn.disabled = true;
                     disconnectBtn.disabled = false;
-                    addLog('WebSocket连接已建立');
+                    addDetailedLog('info', 'WebSocket', '连接已建立', { timestamp: Date.now() });
+                    
+                    // 启动心跳检测
+                    startHeartbeat();
                 };
                 
                 socket.onmessage = function(event) {
-                    const message = JSON.parse(event.data);
-                    addLog(`收到消息: ${message.type}`);
+                    // 收到任何消息都更新最后心跳时间
+                    lastHeartbeatTime = Date.now();
+                    
+                    let message;
+                    try {
+                        message = JSON.parse(event.data);
+                        addDetailedLog('debug', 'WebSocket', `收到消息: ${message.type}`, message);
+                    } catch (e) {
+                        addDetailedLog('error', 'WebSocket', `解析消息失败: ${e.message}`, event.data);
+                        return;
+                    }
                     
                     switch(message.type) {
                         case 'TEXT_RESULT':
                             // 显示识别结果
-                            if (message.text) {
-                                recognitionResult.textContent = message.text;
+                            if (message.message) {
+                                recognitionResult.textContent = message.message;
+                                addDetailedLog('info', '识别结果', message.message);
+                                
+                                // 如果这是一个文件上传的结果，更新uploadResult
+                                if (message.isFileUpload) {
+                                    if (uploadResult.textContent === '处理中...') {
+                                        uploadResult.textContent = '';
+                                    }
+                                    // 将语音识别结果显示为原文
+                                    uploadResult.innerHTML = `<div><strong>原文:</strong> ${message.message}</div>`;
+                                }
                             }
                             break;
                             
                         case 'TRANSLATION':
                             // 显示翻译结果
-                            if (message.text) {
-                                translationResult.textContent = message.text;
+                            if (message.message) {
+                                translationResult.textContent = message.message;
+                                addDetailedLog('info', '翻译结果', message.message);
+                                
+                                // 如果这是文件上传的翻译结果，也更新到uploadResult
+                                if (message.isFileUpload) {
+                                    // 保留原来的识别结果，并添加翻译结果
+                                    let originalText = uploadResult.innerHTML;
+                                    if (originalText === '处理中...' || !originalText.includes('原文:')) {
+                                        originalText = '<div><strong>原文:</strong> (语音识别中...)</div>';
+                                    }
+                                    
+                                    // 添加翻译结果，突出显示
+                                    uploadResult.innerHTML = originalText + 
+                                        `<div style="margin-top:10px;font-weight:bold;color:#4CAF50;">
+                                            <strong>译文:</strong> ${message.message}
+                                         </div>`;
+                                    
+                                    // 恢复上传按钮状态
+                                    uploadBtn.disabled = false;
+                                    uploadBtn.textContent = '上传并翻译';
+                                }
                             }
                             break;
                             
@@ -276,45 +365,189 @@
                                 const base64Audio = message.audio;
                                 const audioData = base64ToArrayBuffer(base64Audio);
                                 
-                                // 创建音频对象
-                                if (audioElement) {
-                                    URL.revokeObjectURL(audioElement.src);
-                                }
+                                addDetailedLog('info', '音频结果', `收到音频数据 ${Math.round(audioData.byteLength / 1024)} KB`);
                                 
+                                // 创建音频对象
                                 const audioBlob = new Blob([audioData], { type: 'audio/wav' });
                                 audioElement = new Audio(URL.createObjectURL(audioBlob));
                                 playBtn.disabled = false;
+                                addDetailedLog('info', '音频结果', `收到音频数据isFileUpload: ${message.fileUpload} `);
+                                // 如果这是文件上传的音频结果，也保存到uploadAudioElement并自动播放
+                                if (message.fileUpload) {
+                                    if (uploadAudioElement) {
+                                        URL.revokeObjectURL(uploadAudioElement.src);
+                                    }
+                                    uploadAudioElement = new Audio(URL.createObjectURL(audioBlob));
+                                    uploadPlayBtn.disabled = false;
+                                    
+                                    // 更新上传结果区域状态
+                                    uploadResult.innerHTML = '<div style="color:#4CAF50;"><strong>处理完成:</strong> 正在播放翻译后的语音</div>';
+                                    
+                                    // 恢复上传按钮状态
+                                    uploadBtn.disabled = false;
+                                    uploadBtn.textContent = '上传并翻译';
+                                    
+                                    addDetailedLog('info', '文件上传', '收到转译后的语音数据，自动播放中');
+                                    
+                                    // 自动播放音频
+                                    try {
+                                        // 添加播放完成事件监听器
+                                        uploadAudioElement.onended = function() {
+                                            uploadResult.innerHTML = '<div style="color:#4CAF50;"><strong>处理完成:</strong> 翻译语音播放完毕，点击"播放翻译语音"按钮可再次收听</div>';
+                                            addDetailedLog('info', '文件上传', '翻译语音播放完毕');
+                                        };
+                                        
+                                        // 添加播放失败监听器
+                                        uploadAudioElement.onerror = function(e) {
+                                            uploadResult.innerHTML = '<div style="color:orange;"><strong>注意:</strong> 自动播放失败，请点击"播放翻译语音"按钮手动播放</div>';
+                                            addDetailedLog('warn', '文件上传', `自动播放失败: ${e.message}`, e);
+                                        };
+                                        
+                                        // 尝试自动播放
+                                        const fallbackMessage = '<div style="color:orange;"><strong>注意:</strong> 自动播放被浏览器阻止，请点击"播放翻译语音"按钮手动播放</div>';
+                                        if (!tryPlayAudio(uploadAudioElement, fallbackMessage)) {
+                                            // 如果第一次失败，等待1秒后再次尝试
+                                            // 这有助于克服某些浏览器的限制
+                                            addDetailedLog('info', '文件上传', '尝试第二次自动播放');
+                                            setTimeout(() => {
+                                                if (!tryPlayAudio(uploadAudioElement, fallbackMessage)) {
+                                                    // 如果第二次也失败，显示提示信息
+                                                    addDetailedLog('warn', '文件上传', '自动播放多次尝试后失败');
+                                                }
+                                            }, 1000);
+                                        }
+                                    } catch (error) {
+                                        addDetailedLog('error', '文件上传', `自动播放过程中出错: ${error.message}`, error);
+                                    }
+                                }
                             }
+                            break;
+                            
+                        case 'PONG':
+                            // 收到服务器心跳响应
+                            const responseTime = Date.now();
+                            const latency = message.timestamp ? (responseTime - message.timestamp) : 'unknown';
+                            addDetailedLog('debug', '心跳', `响应延迟: ${latency} ms`, { 
+                                serverTime: message.timestamp,
+                                clientTime: responseTime
+                            });
                             break;
                             
                         case 'ERROR':
                             // 显示错误信息
-                            addLog(`错误: ${message.text}`);
-                            alert(`发生错误: ${message.text}`);
+                            addDetailedLog('error', 'WebSocket', `错误: ${message.message}`, { 
+                                code: message.errorCode, 
+                                message: message.message 
+                            });
+                            alert(`发生错误: ${message.message}`);
+                            break;
+                            
+                        case 'FILE_UPLOAD_PROGRESS':
+                            // 文件上传进度更新
+                            addDetailedLog('info', '文件上传', `进度更新: ${message.progress}%, ${message.status}`);
+                            
+                            if (message.status) {
+                                uploadResult.innerHTML = `<div style="color:#ff9800;"><strong>处理状态:</strong> ${message.status}</div>`;
+                            }
+                            
+                            if (message.isComplete) {
+                                addDetailedLog('info', '文件上传', '处理完成');
+                                uploadBtn.disabled = false;
+                                uploadBtn.textContent = '上传并翻译';
+                            }
                             break;
                             
                         default:
-                            addLog(`未知消息类型: ${message.type}`);
+                            addDetailedLog('warn', 'WebSocket', `未知消息类型: ${message.type}`, message);
                     }
                 };
                 
-                socket.onclose = function() {
+                socket.onclose = function(event) {
                     wsStatus.className = 'status disconnected';
                     wsStatus.textContent = '已断开连接';
                     connectBtn.disabled = false;
                     disconnectBtn.disabled = true;
                     stopRecording();
-                    addLog('WebSocket连接已关闭');
+                    
+                    const reason = event.reason ? `, 原因: ${event.reason}` : '';
+                    const code = event.code ? `, 代码: ${event.code}` : '';
+                    addDetailedLog('info', 'WebSocket', `连接已关闭${code}${reason}`, event);
+                    
+                    // 停止心跳检测
+                    stopHeartbeat();
                 };
                 
                 socket.onerror = function(error) {
                     wsStatus.className = 'status disconnected';
                     wsStatus.textContent = '连接错误';
-                    addLog(`WebSocket错误: ${error}`);
+                    addDetailedLog('error', 'WebSocket', `连接错误`, error);
+                    
+                    // 停止心跳检测
+                    stopHeartbeat();
                 };
             } catch (error) {
-                addLog(`创建WebSocket时出错: ${error.message}`);
+                addDetailedLog('error', 'WebSocket', `创建连接时出错: ${error.message}`, error);
                 alert(`无法连接到服务器: ${error.message}`);
+            }
+        }
+        
+        // 启动心跳检测
+        function startHeartbeat() {
+            // 初始化最后心跳时间
+            lastHeartbeatTime = Date.now();
+            
+            // 清除可能存在的旧定时器
+            stopHeartbeat();
+            
+            // 设置新的心跳定时器
+            heartbeatInterval = setInterval(() => {
+                // 检查连接状态
+                if (socket && socket.readyState === SockJS.OPEN) {
+                    // 发送心跳消息
+                    sendHeartbeat();
+                    
+                    // 检查是否超时
+                    const timeElapsed = Date.now() - lastHeartbeatTime;
+                    if (timeElapsed > HEARTBEAT_TIMEOUT) {
+                        addDetailedLog('warn', '心跳', `超时 (${timeElapsed}ms)，尝试重新连接`, {
+                            lastHeartbeat: new Date(lastHeartbeatTime).toISOString(),
+                            now: new Date().toISOString()
+                        });
+                        
+                        // 关闭现有连接
+                        disconnectWebSocket();
+                        
+                        // 延迟一下再重连
+                        setTimeout(() => {
+                            connectWebSocket();
+                        }, 1000);
+                    }
+                }
+            }, HEARTBEAT_INTERVAL);
+            
+            addDetailedLog('info', '心跳', `启动检测，间隔=${HEARTBEAT_INTERVAL}ms，超时=${HEARTBEAT_TIMEOUT}ms`);
+        }
+        
+        // 停止心跳检测
+        function stopHeartbeat() {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
+                addDetailedLog('info', '心跳', '停止检测');
+            }
+        }
+        
+        // 发送心跳消息
+        function sendHeartbeat() {
+            if (socket && socket.readyState === SockJS.OPEN) {
+                const currentTime = Date.now();
+                const message = {
+                    type: 'PING',
+                    timestamp: currentTime
+                };
+                
+                socket.send(JSON.stringify(message));
+                addDetailedLog('debug', '心跳', `发送PING`, { timestamp: currentTime });
             }
         }
         
@@ -324,30 +557,43 @@
                 socket.close();
                 socket = null;
             }
+            
+            // 确保心跳检测停止
+            stopHeartbeat();
         }
         
         // 开始录音
         async function startRecording() {
             try {
+                addDetailedLog('info', '录音', '请求麦克风权限');
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
                 
+                addDetailedLog('debug', '录音', `创建MediaRecorder: mimeType=${mediaRecorder.mimeType}`);
+                
                 mediaRecorder.ondataavailable = event => {
                     if (event.data.size > 0) {
                         audioChunks.push(event.data);
+                        addDetailedLog('debug', '录音', `收集音频数据: 大小=${event.data.size}字节, 总块数=${audioChunks.length}`);
                     }
                 };
                 
                 mediaRecorder.onstop = () => {
                     if (!isRecording) return;
                     
+                    addDetailedLog('debug', '录音', `录音片段完成，准备发送`);
                     const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    addDetailedLog('info', '录音', `生成音频Blob: 大小=${audioBlob.size}字节, 类型=${audioBlob.type}`);
+                    
+                    // 发送并清空当前数据
                     sendAudioData(audioBlob);
+                    audioChunks = [];
                     
                     // 继续录音（分段发送）
                     if (isRecording) {
+                        addDetailedLog('debug', '录音', `继续录制下一个音频片段`);
                         mediaRecorder.start(5000); // 每5秒发送一次
                     }
                 };
@@ -358,10 +604,10 @@
                 micBtn.classList.add('mic-active');
                 micBtn.textContent = '🎤 停止录音';
                 recordingStatus.textContent = '正在录音...';
-                addLog('开始录音');
+                addDetailedLog('info', '录音', '开始录音，每5秒分段发送一次');
                 
             } catch (error) {
-                addLog(`录音错误: ${error.message}`);
+                addDetailedLog('error', '录音', `无法访问麦克风: ${error.message}`, error);
                 alert(`无法访问麦克风: ${error.message}`);
             }
         }
@@ -370,28 +616,41 @@
         function stopRecording() {
             if (mediaRecorder && isRecording) {
                 isRecording = false;
-                mediaRecorder.stop();
                 
-                // 停止所有轨道
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                
-                micBtn.classList.remove('mic-active');
-                micBtn.textContent = '🎤 开始录音';
-                recordingStatus.textContent = '';
-                addLog('停止录音');
+                try {
+                    mediaRecorder.stop();
+                    addDetailedLog('info', '录音', '停止录音');
+                    
+                    // 停止所有轨道
+                    mediaRecorder.stream.getTracks().forEach(track => {
+                        track.stop();
+                        addDetailedLog('debug', '录音', `停止音频轨道: kind=${track.kind}, label=${track.label}`);
+                    });
+                    
+                    micBtn.classList.remove('mic-active');
+                    micBtn.textContent = '🎤 开始录音';
+                    recordingStatus.textContent = '';
+                } catch (error) {
+                    addDetailedLog('error', '录音', `停止录音时出错: ${error.message}`, error);
+                }
             }
         }
         
         // 发送音频数据
         function sendAudioData(audioBlob) {
             if (!socket || socket.readyState !== SockJS.OPEN) {
-                addLog('无法发送音频：WebSocket未连接');
+                addDetailedLog('error', '录音', '无法发送音频：WebSocket未连接', { readyState: socket ? socket.readyState : 'null' });
                 return;
             }
+            
+            const startTime = Date.now();
+            addDetailedLog('info', '录音', `准备发送音频数据: 大小=${Math.round(audioBlob.size / 1024)}KB`);
             
             const reader = new FileReader();
             reader.onload = function() {
                 const arrayBuffer = reader.result;
+                addDetailedLog('debug', '录音', `音频读取完成: 大小=${Math.round(arrayBuffer.byteLength / 1024)}KB, 耗时=${Date.now() - startTime}ms`);
+                
                 const base64Audio = arrayBufferToBase64(arrayBuffer);
                 
                 // 创建请求对象
@@ -413,9 +672,31 @@
                     request: translationRequest
                 };
                 
+                // 记录发送前的详细信息
+                addDetailedLog('debug', '录音', `构建音频消息: 源语言=${translationRequest.sourceLanguage}, 目标语言=${translationRequest.targetLanguage}, 提供商=${translationRequest.provider}`, { voice: translationRequest.voice });
+                
+                // 计算发送时间
+                const sendStart = Date.now();
+                
                 // 发送消息
                 socket.send(JSON.stringify(message));
-                addLog(`已发送 ${Math.round(arrayBuffer.byteLength / 1024)} KB 音频数据`);
+                
+                const sendEnd = Date.now();
+                const sendTime = sendEnd - sendStart;
+                
+                addDetailedLog('info', '录音', `已发送音频数据: 大小=${Math.round(arrayBuffer.byteLength / 1024)}KB, 发送耗时=${sendTime}ms`, { 
+                    totalTime: sendEnd - startTime,
+                    sendTime: sendTime
+                });
+                
+                // 记录异常慢的发送
+                if (sendTime > 500) {
+                    addDetailedLog('warn', '录音', `音频数据发送耗时过长: ${sendTime}ms`, { dataSize: Math.round(arrayBuffer.byteLength / 1024) });
+                }
+            };
+            
+            reader.onerror = function(error) {
+                addDetailedLog('error', '录音', `读取音频数据失败: ${error.message}`, error);
             };
             
             reader.readAsArrayBuffer(audioBlob);
@@ -450,38 +731,82 @@
                 return;
             }
             
-            // 创建FormData对象
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('sourceLanguage', sourceLanguage.value);
-            formData.append('targetLanguage', targetLanguage.value);
-            formData.append('provider', provider.value);
-            
-            if (voice.value) {
-                formData.append('voice', voice.value);
+            // 检查WebSocket连接
+            if (!socket || socket.readyState !== SockJS.OPEN) {
+                addDetailedLog('error', '文件上传', '请先连接到WebSocket服务器');
+                alert('请先连接到服务器');
+                return;
             }
             
-            addLog(`正在上传文件: ${file.name} (${Math.round(file.size / 1024)} KB)`);
-            
-            // 发送请求
-            fetch('/api/translation/file', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP错误 ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                addLog('文件翻译完成');
-                uploadResult.textContent = data.text || '无翻译结果';
-            })
-            .catch(error => {
-                addLog(`文件翻译错误: ${error.message}`);
-                alert(`上传失败: ${error.message}`);
+            addDetailedLog('info', '文件上传', `开始通过WebSocket上传文件: ${file.name}, 大小=${Math.round(file.size / 1024)}KB, 类型=${file.type}`, {
+                sourceLanguage: sourceLanguage.value,
+                targetLanguage: targetLanguage.value,
+                provider: provider.value,
+                voice: voice.value || 'default'
             });
+            
+            // 禁用按钮防止重复上传
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '上传中...';
+            uploadPlayBtn.disabled = true;
+            
+            // 清空上传结果区域并显示处理中提示
+            uploadResult.innerHTML = '<div style="color:#ff9800;"><strong>处理状态:</strong> 处理中...</div>';
+            recognitionResult.textContent = '';
+            translationResult.textContent = '';
+            
+            // 读取文件
+            const reader = new FileReader();
+            reader.onload = function() {
+                const arrayBuffer = reader.result;
+                addDetailedLog('debug', '文件上传', `文件读取完成: 大小=${Math.round(arrayBuffer.byteLength / 1024)}KB`);
+                
+                // 转换为Base64
+                const base64File = arrayBufferToBase64(arrayBuffer);
+                
+                // 创建请求对象 - 使用页面上的配置
+                const translationRequest = {
+                    sourceLanguage: sourceLanguage.value,
+                    targetLanguage: targetLanguage.value,
+                    provider: provider.value,
+                    mode: 'speech-to-speech',  // 明确指定模式为语音到语音
+                    voice: voice.value || undefined,
+                    returnAudio: true  // 明确要求返回音频数据
+                };
+                
+                // 创建WebSocket消息
+                const message = {
+                    type: 'FILE_UPLOAD',
+                    audio: base64File,
+                    request: translationRequest,
+                    filename: file.name,
+                    fileType: file.type,
+                    timestamp: Date.now()
+                };
+                
+                // 记录发送前的详细信息
+                addDetailedLog('debug', '文件上传', `构建上传消息: 源语言=${translationRequest.sourceLanguage}, 目标语言=${translationRequest.targetLanguage}, 提供商=${translationRequest.provider}, 模式=${translationRequest.mode}`);
+                
+                try {
+                    // 发送消息
+                    socket.send(JSON.stringify(message));
+                    addDetailedLog('info', '文件上传', `文件已通过WebSocket发送，等待处理`);
+                } catch (error) {
+                    addDetailedLog('error', '文件上传', `发送文件失败: ${error.message}`, error);
+                    uploadResult.innerHTML = `<div style="color:red;"><strong>错误:</strong> ${error.message}</div>`;
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = '上传并翻译';
+                }
+            };
+            
+            reader.onerror = function(error) {
+                addDetailedLog('error', '文件上传', `读取文件失败: ${error}`, error);
+                uploadResult.innerHTML = `<div style="color:red;"><strong>错误:</strong> 读取文件失败</div>`;
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '上传并翻译';
+            };
+            
+            reader.readAsArrayBuffer(file);
         }
         
         // 复制文本
@@ -516,8 +841,34 @@
         
         playBtn.addEventListener('click', function() {
             if (audioElement) {
-                audioElement.play();
-                addLog('正在播放合成的语音');
+                // 如果正在播放，先暂停并重置
+                if (!audioElement.paused) {
+                    audioElement.pause();
+                    audioElement.currentTime = 0;
+                }
+                
+                const playResult = tryPlayAudio(audioElement);
+                if (playResult) {
+                    addLog('正在播放合成的语音');
+                }
+            }
+        });
+        
+        uploadPlayBtn.addEventListener('click', function() {
+            if (uploadAudioElement) {
+                // 如果正在播放，先暂停并重置
+                if (!uploadAudioElement.paused) {
+                    uploadAudioElement.pause();
+                    uploadAudioElement.currentTime = 0;
+                }
+                
+                const playResult = tryPlayAudio(uploadAudioElement, 
+                    '<div style="color:red;"><strong>错误:</strong> 播放失败，请检查浏览器音频设置</div>');
+                
+                if (playResult) {
+                    addLog('正在播放文件转译后的语音');
+                    uploadResult.innerHTML = '<div style="color:#4CAF50;"><strong>播放中:</strong> 正在播放翻译后的语音</div>';
+                }
             }
         });
         
@@ -526,10 +877,14 @@
         clearBtn.addEventListener('click', function() {
             recognitionResult.textContent = '';
             translationResult.textContent = '';
+            
+            // 先停止可能正在播放的音频
             if (audioElement) {
+                audioElement.pause();
                 URL.revokeObjectURL(audioElement.src);
                 audioElement = null;
             }
+            
             playBtn.disabled = true;
             addLog('已清除结果');
         });
@@ -540,8 +895,63 @@
             logs.innerHTML = '';
         });
         
+        // 初始化用户交互，帮助解除自动播放限制
+        function initUserInteraction() {
+            // 监听页面任意位置的点击事件，用于激活音频自动播放能力
+            document.addEventListener('click', function() {
+                // 创建并播放一个极短的静音音频，触发浏览器的用户交互标记
+                // 这样后续的自动播放更容易成功
+                if (!window.audioContextInitialized) {
+                    try {
+                        // 创建一个临时的音频上下文
+                        const tempContext = new (window.AudioContext || window.webkitAudioContext)();
+                        
+                        // 创建一个空的音频buffer (0.1秒静音)
+                        const buffer = tempContext.createBuffer(1, tempContext.sampleRate * 0.1, tempContext.sampleRate);
+                        const source = tempContext.createBufferSource();
+                        source.buffer = buffer;
+                        source.connect(tempContext.destination);
+                        
+                        // 播放这个静音buffer
+                        source.start(0);
+                        source.stop(tempContext.currentTime + 0.1);
+                        
+                        window.audioContextInitialized = true;
+                        addDetailedLog('debug', '音频', '用户交互已初始化音频上下文');
+                    } catch (e) {
+                        addDetailedLog('warn', '音频', `初始化音频上下文失败: ${e.message}`, e);
+                    }
+                }
+            }, { once: true }); // 只触发一次
+        }
+        
+        // 尝试暂挂的音频播放（用于多次重试自动播放）
+        function tryPlayAudio(audioElement, fallbackMessage) {
+            if (!audioElement) return false;
+            
+            try {
+                const playPromise = audioElement.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        addDetailedLog('warn', '音频播放', `播放失败: ${error}`, { error });
+                        if (fallbackMessage) {
+                            uploadResult.innerHTML = fallbackMessage;
+                        }
+                        return false;
+                    });
+                    return true;
+                }
+            } catch (e) {
+                addDetailedLog('error', '音频播放', `播放过程出错: ${e.message}`, e);
+                return false;
+            }
+            return false;
+        }
+        
         // 初始化
         addLog('页面已加载，准备就绪');
+        initUserInteraction();
     </script>
 </body>
 </html> 

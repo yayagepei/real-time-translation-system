@@ -88,6 +88,77 @@ public class TranslationController {
     }
     
     /**
+     * 文件上传翻译接口
+     */
+    @PostMapping(value = "/translation/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Object>> translateFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "sourceLanguage", defaultValue = "auto") String sourceLanguage,
+            @RequestParam(value = "targetLanguage", defaultValue = "en-US") String targetLanguage,
+            @RequestParam(value = "provider", defaultValue = "microsoft") String provider,
+            @RequestParam(value = "voice", required = false) String voice) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            log.info("收到文件上传翻译请求: 文件大小={}, 源语言={}, 目标语言={}, 提供商={}, 语音={}",
+                    file.getSize(), sourceLanguage, targetLanguage, provider, voice);
+            
+            byte[] audioData = file.getBytes();
+            
+            // 创建翻译请求
+            TranslationRequest request = TranslationRequest.builder()
+                    .sourceLanguage(sourceLanguage)
+                    .targetLanguage(targetLanguage)
+                    .provider(provider)
+                    .voice(voice)
+                    .mode("speech-to-text") // 文件上传默认为语音到文本模式
+                    .build();
+            
+            // 选择服务提供商
+            SpeechService speechService;
+            if ("openai".equalsIgnoreCase(provider)) {
+                speechService = openAISpeechService;
+            } else {
+                speechService = microsoftSpeechService;
+            }
+            
+            // 语音转文字
+            String recognizedText = speechService.speechToText(audioData, sourceLanguage).blockFirst();
+            log.info("语音识别成功: {}", recognizedText);
+            
+            // 如果源语言和目标语言不同，则进行翻译
+            String translatedText = recognizedText;
+            if (!sourceLanguage.equals(targetLanguage) && !"auto".equals(sourceLanguage)) {
+                // 这里可以接入翻译服务
+                // translatedText = translationService.translate(recognizedText, sourceLanguage, targetLanguage);
+                log.info("翻译不同语言的功能暂未实现");
+            }
+            
+            response.put("success", true);
+            response.put("text", translatedText);
+            response.put("provider", provider);
+            response.put("sourceLanguage", sourceLanguage);
+            response.put("targetLanguage", targetLanguage);
+            
+            log.info("文件翻译处理完成");
+            
+        } catch (IOException e) {
+            log.error("读取音频文件失败", e);
+            response.put("success", false);
+            response.put("error", "无法读取音频文件: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            log.error("处理文件翻译时出错", e);
+            response.put("success", false);
+            response.put("error", "处理文件翻译时出错: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+        
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
      * 获取系统信息
      */
     @GetMapping("/info")

@@ -60,7 +60,7 @@ public class AudioUtils {
             });
             
             // 创建不同的文件名用于输入和输出
-            String fileName = String.format("%s_%s_%d.bin", sessionFilePath, type, System.currentTimeMillis());
+            String fileName = String.format("%s_%s_%d.wav", sessionFilePath, type, System.currentTimeMillis());
             
             // 保存音频数据到文件
             try (FileOutputStream fos = new FileOutputStream(fileName)) {

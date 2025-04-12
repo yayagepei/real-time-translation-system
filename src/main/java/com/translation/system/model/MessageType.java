@@ -15,6 +15,11 @@ public enum MessageType {
     TEXT_RESULT,
     
     /**
+     * 翻译结果
+     */
+    TRANSLATION,
+    
+    /**
      * 错误消息
      */
     ERROR,
@@ -22,5 +27,30 @@ public enum MessageType {
     /**
      * 关闭连接
      */
-    CLOSE
+    CLOSE,
+    
+    /**
+     * 心跳请求
+     */
+    PING,
+    
+    /**
+     * 心跳响应
+     */
+    PONG,
+    
+    /**
+     * 文件上传
+     */
+    FILE_UPLOAD,
+    
+    /**
+     * 文件上传进度
+     */
+    FILE_UPLOAD_PROGRESS,
+    
+    /**
+     * 音频结果
+     */
+    AUDIO_RESULT
 } 

@@ -33,9 +33,72 @@ public class WebSocketMessage {
     private byte[] audioData;
     
     /**
+     * 时间戳（主要用于心跳消息）
+     */
+    private Long timestamp;
+    
+    /**
      * 翻译请求配置（仅初始化时使用）
      */
     private TranslationRequest request;
+    
+    /**
+     * 音频Base64编码（用于音频数据和文件上传）
+     */
+    private String audio;
+    
+    /**
+     * 进度百分比（用于文件上传进度）
+     */
+    private Integer progress;
+    
+    /**
+     * 处理状态描述（用于文件上传进度）
+     */
+    private String status;
+    
+    /**
+     * 处理是否完成（用于文件上传进度）
+     */
+    private Boolean isComplete;
+    
+    /**
+     * 是否为文件上传结果
+     */
+    @Builder.Default
+    private boolean isFileUpload = false;
+    
+    /**
+     * 是否为分块消息
+     */
+    @Builder.Default
+    private boolean isChunked = false;
+    
+    /**
+     * 当前块索引（从0开始）
+     */
+    private Integer chunkIndex;
+    
+    /**
+     * 总块数
+     */
+    private Integer totalChunks;
+    
+    /**
+     * 分块传输是否完成标记
+     */
+    @Builder.Default
+    private boolean isChunkedComplete = false;
+    
+    /**
+     * 文件名（用于文件上传）
+     */
+    private String filename;
+    
+    /**
+     * 文件类型（用于文件上传）
+     */
+    private String fileType;
     
     /**
      * 错误代码（仅错误消息使用）
@@ -87,6 +150,17 @@ public class WebSocketMessage {
         return WebSocketMessage.builder()
                 .type(MessageType.TEXT_RESULT)
                 .audioData(audioData)
+                .build();
+    }
+    
+    /**
+     * 创建心跳响应消息
+     */
+    public static WebSocketMessage pong() {
+        return WebSocketMessage.builder()
+                .type(MessageType.PONG)
+                .message("pong")
+                .timestamp(System.currentTimeMillis())
                 .build();
     }
 } 
